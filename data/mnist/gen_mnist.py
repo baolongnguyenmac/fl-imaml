@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from typing import Tuple
 import json
+import matplotlib.pyplot as plt
 
 NUM_CLIENT = 50
 NUM_LABEL_PER_CLIENT = 2
@@ -68,6 +69,19 @@ def divide_data_for_clients(data_by_label: list[np.ndarray], num_sample_in_label
             flag2[label] += 1
     return all_user
 
+def vis_sample(data_by_label: list[np.ndarray]):
+    # vis label 0->9
+    list_09 = [label[0,:] for label in data_by_label]
+
+    fig, axs = plt.subplots(2,5, (10,5))
+    fig.suptitle('Vis label 0 -> 9')
+    for (ax, img) in zip(axs.flat, enumerate(list_09)):
+        ax.set_title(img[0])
+        img = img[1].reshape(28,28)
+        ax.imshow(img, cmap='gray')
+
+    plt.show()
+
 def gen_mnist():
     """generate data for non-iid scenario (no local client for testing)
     """
@@ -96,5 +110,5 @@ def gen_mnist():
         with open(f'./client_test/{user}.json', 'w') as fp:
             json.dump(all_user_test[user], fp)
 
-if __name__=='__main__':
-    gen_mnist()
+# if __name__=='__main__':
+#     gen_mnist()
