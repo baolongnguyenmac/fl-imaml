@@ -1,3 +1,36 @@
+# tmp file of system
+.vscode
+.ipynb_checkpoints
+.DS_Store
+__pycache__
+
+# latex stuff
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.log
+*.lot
+*.out
+*.xml
+*.toc
+*.gz
+*.wsp
+main-blx.bib
+
+# dataset
+test*
+train*
+tmp
+*.csv
+*.zip
+*.json
+
+# run_split script
+data_gen.sh
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
