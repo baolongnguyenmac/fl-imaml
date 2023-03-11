@@ -1,6 +1,5 @@
 # tmp file of system
 .vscode
-.ipynb_checkpoints
 .DS_Store
 __pycache__
 
@@ -21,8 +20,6 @@ __pycache__
 main-blx.bib
 
 # dataset
-test*
-train*
 tmp
 *.csv
 *.zip
