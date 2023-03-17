@@ -9,13 +9,15 @@ class BaseClient:
         local_lr:float,
         loader:DataLoader,
         model:torch.nn.Module,
-        device:torch.device
+        device:torch.device,
+        id:int
     ) -> None:
         self.local_epochs:int = local_epochs
         self.local_lr:float = local_lr
         self.loader:DataLoader = loader
         self.model:torch.nn.Module = deepcopy(model)
         self.device = device
+        self.id = id
 
     def _set_param(self, model:torch.nn.Module):
         for local_p, global_p in zip(self.model.parameters(), model.parameters()):
@@ -61,6 +63,7 @@ class BaseClient:
         return testing_loss/size, correct/size
 
     def train(self):
+        print(f'Client {self.id}: Training')
         for _ in range(self.local_epochs):
             loss, acc = self._train_step()
 

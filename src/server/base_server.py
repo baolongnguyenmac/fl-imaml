@@ -4,18 +4,17 @@ from torch.nn.parameter import Parameter
 import numpy as np
 from typing import Iterator
 
-from src.client.base_client import BaseClient
+from client.base_client import BaseClient
 
 class BaseServer:
     def __init__(
         self,
         global_epochs:int,
         local_epochs:int,
-        dataset:str,
         device:torch.device,
         local_lr:float,
         global_lr:float,
-        algorithm:torch.optim.Optimizer,
+        # algorithm:torch.optim.Optimizer,
         model:torch.nn.Module,
         num_training_clients:int,
         training_loaders:list[DataLoader],
@@ -23,10 +22,9 @@ class BaseServer:
     ) -> None:
         # init server param
         self.global_epochs:int = global_epochs
-        self.dataset:str = dataset
         self.device:torch.device = device
         self.global_lr:float = global_lr
-        self.algorithm = algorithm
+        # self.algorithm = algorithm
         self.model:torch.nn.Module = model
         self.num_activated_clients:int = num_training_clients # clients per round
         self.train_log = {'losses':{}, 'std_losses':{}, 'accs':{}, 'std_accs':{}}
@@ -38,12 +36,12 @@ class BaseServer:
         self.selected_clients:list[BaseClient] = []
 
         # init data for client
-        for loader in training_loaders:
-            tmp_client = BaseClient(local_epochs, local_lr, loader, self.model)
+        for idx, loader in enumerate(training_loaders):
+            tmp_client = BaseClient(local_epochs, local_lr, loader, model, device, idx)
             self.training_clients.append(tmp_client)
 
-        for loader in testing_loader:
-            tmp_client = BaseClient(local_epochs, local_lr, loader, self.model)
+        for idx, loader in enumerate(testing_loader):
+            tmp_client = BaseClient(local_epochs, local_lr, loader, model, device, idx)
             self.testing_clients.append(tmp_client)
 
     def _add_param(self, params:Iterator[Parameter], ratio:float):
@@ -63,7 +61,8 @@ class BaseServer:
     def compute_mean_std(self, array:list):
         return np.mean(array), np.std(array)
 
-    def test(self):
+    def test(self, round:int):
+        print(f'\nRun test on {len(self.testing_clients)} clients')
         self._distribute_model(self.testing_clients)
         losses = []
         accs = []
@@ -77,6 +76,7 @@ class BaseServer:
         self.test_log['accs'][round], self.test_log['std_accs'][round] = self.compute_mean_std(accs)
 
     def _distribute_model(self, list_clients:list[BaseClient]):
+        print('Distribute global model')
         for client in list_clients:
             client._set_param(self.model)
 
@@ -95,11 +95,14 @@ class BaseServer:
 
     def train(self):
         for r in range(self.global_epochs):
+            print(f'\n============= Round {r} =============\n')
             # train global model using a batch of clients
             self.selected_clients:list[BaseClient] = np.random.choice(self.training_clients, self.num_activated_clients, replace=False)
             self._distribute_model(self.selected_clients)
             self._train_step(r)
+            print(f"[Train]Loss: {self.train_log['losses'][r]:>7f}, Acc: {self.train_log['accs'][r]:>7f}")
 
             # evaluate global model each 20 rounds
-            if (r+1)%20 == 0:
-                self.test()
+            if (r+1)%20 == 0 or r == 0:
+                self.test(r)
+                print(f"[Test] Loss: {self.test_log['losses'][r]:>7f}, Acc: {self.test_log['accs'][r]:>7f}")
