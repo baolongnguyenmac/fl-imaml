@@ -20,10 +20,8 @@ __pycache__
 main-blx.bib
 
 # dataset
-tmp
-*.csv
-*.zip
-*.json
+data/mnist
+data/cifar
 
 # run_split script
 data_gen.sh
