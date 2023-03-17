@@ -174,12 +174,12 @@ def gen_mnist(dir='./data/mnist/'):
     os.mkdir(join(dir, 'client_train'))
 
     for user in all_user_train.keys():
-        with open(join(dir, f'client_train/{user}.json'), 'w') as fp:
-            json.dump(all_user_train[user], fp)
+        with open(join(dir, f'client_train/{user}.json'), 'w') as fo:
+            json.dump(all_user_train[user], fo)
 
     for user in all_user_test.keys():
-        with open(join(dir, f'client_test/{user}.json'), 'w') as fp:
-            json.dump(all_user_test[user], fp)
+        with open(join(dir, f'client_test/{user}.json'), 'w') as fo:
+            json.dump(all_user_test[user], fo)
 
     print('\nDone')
 

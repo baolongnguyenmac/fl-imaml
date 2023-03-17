@@ -3,7 +3,7 @@ import os
 import torch
 
 from data.mnist_loader import get_loader as m_loader
-from server.base_server import BaseServer
+from server.fedavg_server import FedAvgServer
 from model.mnist_model import Mnist
 
 MNIST_DATA = MNIST_MODEL = 'mnist'
@@ -46,23 +46,24 @@ def config_model(model:str):
     elif model == CIFAR_MODEL:
         pass
 
-def get_server(args: argparse.Namespace):
+def get_server(args: argparse.Namespace, command:dict):
     print('Preparing server')
     train_loaders, test_support_loaders, test_query_loaders = config_dataset(args.dataset)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     algo = args.algorithm
     if algo == FED_AVG:
-        return BaseServer(
+        return FedAvgServer(
             global_epochs=args.global_epochs,
             local_epochs=args.local_epochs,
             device=device,
-            local_lr=args.local_lr,
             global_lr=args.global_lr,
+            local_lr=args.local_lr,
             model=config_model(args.model),
-            num_training_clients=args.client_per_round,
+            num_activated_clients=args.clients_per_round,
             training_loaders=train_loaders,
-            testing_loader=test_query_loaders)
+            testing_loader=train_loaders,
+            command=command)
     elif algo == FED_MAML:
         pass
     elif algo == FED_IMAML:
@@ -81,11 +82,12 @@ def main():
     parser.add_argument("--dataset", type=str, required=True, help="Dataset", choices=[MNIST_DATA, CIFAR_DATA], default='mnist')
     parser.add_argument("--model", type=str, required=True, help="Model", choices=[MNIST_MODEL, CIFAR_MODEL], default='mnist')
     parser.add_argument("--algorithm", type=str, required=True, help="Algorithm", choices=[FED_AVG, FED_MAML, FED_IMAML], default='fed_avg')
-    parser.add_argument("--client_per_round", type=int, required=True, help="Number of client evolving in training each round", default=5)
+    parser.add_argument("--clients_per_round", type=int, required=True, help="Number of client evolving in training each round", default=5)
 
     args = parser.parse_args()
+    command:dict = vars(args)
 
-    server = get_server(args)
+    server = get_server(args, command)
     server.train()
 
 if __name__ == '__main__':

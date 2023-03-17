@@ -1,32 +1,38 @@
 import torch
-from torch.utils.data import DataLoader
 from torch.nn.parameter import Parameter
 import numpy as np
 from typing import Iterator
+from datetime import datetime
+from os.path import isdir, join
+from os import mkdir
+import json
 
 from client.base_client import BaseClient
 
 class BaseServer:
     def __init__(
-        self,
-        global_epochs:int,
-        local_epochs:int,
-        device:torch.device,
-        local_lr:float,
-        global_lr:float,
-        # algorithm:torch.optim.Optimizer,
-        model:torch.nn.Module,
-        num_training_clients:int,
-        training_loaders:list[DataLoader],
-        testing_loader:list[DataLoader]
-    ) -> None:
+            self,
+            global_epochs:int,
+            # local_epochs:int,
+            device:torch.device,
+            # local_lr:float,
+            global_lr:float,
+            # algorithm:torch.optim.Optimizer,
+            model:torch.nn.Module,
+            num_activated_clients:int,
+            # training_loaders:list[DataLoader],
+            # testing_loader:list[DataLoader],
+            command:dict
+        ) -> None:
+
         # init server param
         self.global_epochs:int = global_epochs
         self.device:torch.device = device
         self.global_lr:float = global_lr
         # self.algorithm = algorithm
         self.model:torch.nn.Module = model
-        self.num_activated_clients:int = num_training_clients # clients per round
+        self.num_activated_clients:int = num_activated_clients # clients per round
+        self.command:dict = command
         self.train_log = {'losses':{}, 'std_losses':{}, 'accs':{}, 'std_accs':{}}
         self.test_log = {'losses':{}, 'std_losses':{}, 'accs':{}, 'std_accs':{}}
 
@@ -34,15 +40,6 @@ class BaseServer:
         self.training_clients:list[BaseClient] = []
         self.testing_clients:list[BaseClient] = []
         self.selected_clients:list[BaseClient] = []
-
-        # init data for client
-        for idx, loader in enumerate(training_loaders):
-            tmp_client = BaseClient(local_epochs, local_lr, loader, model, device, idx)
-            self.training_clients.append(tmp_client)
-
-        for idx, loader in enumerate(testing_loader):
-            tmp_client = BaseClient(local_epochs, local_lr, loader, model, device, idx)
-            self.testing_clients.append(tmp_client)
 
     def _add_param(self, params:Iterator[Parameter], ratio:float):
         for global_p, local_p in zip(self.model.parameters(), params):
@@ -88,8 +85,8 @@ class BaseServer:
             losses.append(loss)
             accs.append(acc)
 
-        self.train_log['losses'][round] = sum(losses)/len(losses)
-        self.train_log['accs'][round] = sum(accs)/len(accs)
+        self.train_log['losses'][round], self.train_log['std_losses'][round] = self.compute_mean_std(losses)
+        self.train_log['accs'][round], self.train_log['std_accs'][round] = self.compute_mean_std(accs)
 
         self._aggregate()
 
@@ -103,6 +100,29 @@ class BaseServer:
             print(f"[Train]Loss: {self.train_log['losses'][r]:>7f}, Acc: {self.train_log['accs'][r]:>7f}")
 
             # evaluate global model each 20 rounds
-            if (r+1)%20 == 0 or r == 0:
+            if (r+1)%5 == 0 or r == 0:
                 self.test(r)
                 print(f"[Test] Loss: {self.test_log['losses'][r]:>7f}, Acc: {self.test_log['accs'][r]:>7f}")
+
+        # save log to ./experiment
+        self.save_log()
+
+    def save_log(self):
+        dir_ = join('../experiment', datetime.today().strftime('%Y-%m-%d'))
+        print(f'\nWrite log to {dir_}')
+
+        if not isdir(dir_):
+            mkdir(dir_)
+
+        dir__ = join(dir_, datetime.today().strftime('%H:%M'))
+        mkdir(dir__)
+
+        with open(join(dir__, 'description.json'), 'w') as fo:
+            self.command['note'] = 'enter your note'
+            json.dump(self.command, fo)
+
+        with open(join(dir__, 'training_log.json'), 'w') as fo:
+            json.dump(self.train_log, fo)
+
+        with open(join(dir__, 'testing_log.json'), 'w') as fo:
+            json.dump(self.test_log, fo)
