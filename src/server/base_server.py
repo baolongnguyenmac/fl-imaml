@@ -46,14 +46,15 @@ class BaseServer:
             global_p.data += local_p.data.clone()*ratio
 
     def _aggregate(self):
+        print('Aggregate local model of base clients')
         total_sample = 0
         for client in self.selected_clients:
-            total_sample += len(client.loader.dataset)
+            total_sample += client.num_training_sample
 
         for p in self.model.parameters():
             p.data = torch.zeros_like(p.data)
         for client in self.selected_clients:
-            self._add_param(client.model.parameters(), len(client.loader.dataset)/total_sample)
+            self._add_param(client.model.parameters(), client.num_training_sample/total_sample)
 
     def compute_mean_std(self, array:list):
         return np.mean(array), np.std(array)
@@ -97,7 +98,7 @@ class BaseServer:
             self.selected_clients:list[BaseClient] = np.random.choice(self.training_clients, self.num_activated_clients, replace=False)
             self._distribute_model(self.selected_clients)
             self._train_step(r)
-            print(f"[Train]Loss: {self.train_log['losses'][r]:>7f}, Acc: {self.train_log['accs'][r]:>7f}")
+            print(f"[Train] Loss: {self.train_log['losses'][r]:>7f}, Acc: {self.train_log['accs'][r]:>7f}")
 
             # evaluate global model each 20 rounds
             if (r+1)%5 == 0 or r == 0:
