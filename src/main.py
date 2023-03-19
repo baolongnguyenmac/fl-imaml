@@ -4,6 +4,7 @@ import torch
 
 from data.mnist_loader import get_loader as m_loader
 from server.fedavg_server import FedAvgServer
+from server.fedmaml_server import FedMAMLServer
 from model.mnist_model import Mnist
 
 MNIST_DATA = MNIST_MODEL = 'mnist'
@@ -14,7 +15,7 @@ FED_MAML = 'fed_maml'
 FED_IMAML = 'fed_imaml'
 
 def config_dataset(dataset:str):
-    print('Preparing dataset')
+    print('\nPreparing dataset ...')
     train_loaders = []
     test_support_loaders = []
     test_query_loaders = []
@@ -40,14 +41,14 @@ def config_dataset(dataset:str):
     return train_loaders, test_support_loaders, test_query_loaders
 
 def config_model(model:str):
-    print('Preparing model')
+    print('\nPreparing model ...')
     if model == MNIST_MODEL:
         return Mnist()
     elif model == CIFAR_MODEL:
         pass
 
 def get_server(args: argparse.Namespace, command:dict):
-    print('Preparing server')
+    print('\nPreparing server ...')
     train_loaders, test_support_loaders, test_query_loaders = config_dataset(args.dataset)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -62,10 +63,21 @@ def get_server(args: argparse.Namespace, command:dict):
             model=config_model(args.model),
             num_activated_clients=args.clients_per_round,
             training_loaders=train_loaders,
-            testing_loader=train_loaders,
+            testing_loaders=test_query_loaders,
             command=command)
     elif algo == FED_MAML:
-        pass
+        return FedMAMLServer(
+            global_epochs=args.global_epochs,
+            local_epochs=args.local_epochs,
+            device=device,
+            global_lr=args.global_lr,
+            local_lr=args.local_lr,
+            model=config_model(args.model),
+            num_activated_clients=args.clients_per_round,
+            training_loaders=train_loaders,
+            test_support_loaders=test_support_loaders,
+            test_query_loaders=test_query_loaders,
+            command=command)
     elif algo == FED_IMAML:
         pass
     else:
@@ -76,9 +88,9 @@ def main():
     parser = argparse.ArgumentParser(description="FL + iMAML")
 
     parser.add_argument("--global_epochs", type=int, required=True, help="Global epochs")
-    parser.add_argument("--global_lr", type=float, required=True, help="Global learning rate", default=1e-3)
+    parser.add_argument("--global_lr", type=float, required=False, help="Global learning rate")
     parser.add_argument("--local_epochs", type=int, required=True, help="Local epochs")
-    parser.add_argument("--local_lr", type=float, required=True, help="Local learning rate", default=1e-3)
+    parser.add_argument("--local_lr", type=float, required=True, help="Local learning rate")
     parser.add_argument("--dataset", type=str, required=True, help="Dataset", choices=[MNIST_DATA, CIFAR_DATA], default='mnist')
     parser.add_argument("--model", type=str, required=True, help="Model", choices=[MNIST_MODEL, CIFAR_MODEL], default='mnist')
     parser.add_argument("--algorithm", type=str, required=True, help="Algorithm", choices=[FED_AVG, FED_MAML, FED_IMAML], default='fed_avg')
