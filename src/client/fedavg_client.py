@@ -50,14 +50,13 @@ class FedAvgClient(BaseClient):
         loss_fn = torch.nn.CrossEntropyLoss()
 
         num_sample = len(self.testing_loader.dataset)
-        testing_loss, correct = 0, 0
+        testing_loss, correct = 0., 0.
 
         self.model.eval()
         with torch.no_grad():
-            for X, y in self.testing_loader:
-                X, y = X.to(self.device), y.to(self.device)
-                pred:torch.Tensor = self.model(X)
-                testing_loss += loss_fn(pred, y).item()
-                correct += (pred.argmax(1) == y).type(torch.float).sum().item()
+            for batch in self.testing_loader:
+                loss, correct_ = self._training_step(batch, self.model, loss_fn)
+                testing_loss += loss.item()
+                correct += correct_
 
         return testing_loss, correct/num_sample
