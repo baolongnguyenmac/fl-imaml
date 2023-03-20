@@ -78,7 +78,7 @@ class BaseServer:
         for client in list_clients:
             client._set_param(self.model)
 
-    def _train_step(self, round:int):
+    def _training_step(self, round:int):
         losses = []
         accs = []
         for client in self.selected_clients:
@@ -97,13 +97,13 @@ class BaseServer:
             # train global model using a batch of clients
             self.selected_clients:list[BaseClient] = np.random.choice(self.training_clients, self.num_activated_clients, replace=False)
             self._distribute_model(self.selected_clients)
-            self._train_step(r)
-            print(f"[Train] Loss: {self.train_log['losses'][r]:>7f}, Acc: {self.train_log['accs'][r]:>7f}")
+            self._training_step(r)
+            print(f"[Train] Loss: {self.train_log['losses'][r]:.7f}, Acc: {self.train_log['accs'][r]*100:.2f}±{self.train_log['std_accs'][r]*100:.2f}%")
 
             # evaluate global model each 20 rounds
             if (r+1)%5 == 0 or r == 0:
                 self.test(r)
-                print(f"[Test] Loss: {self.test_log['losses'][r]:>7f}, Acc: {self.test_log['accs'][r]:>7f}")
+                print(f"[Test] Loss: {self.test_log['losses'][r]:.7f}, Acc: {self.test_log['accs'][r]*100:.2f}±{self.test_log['std_accs'][r]*100:.2f}%")
 
         # save log to ./experiment
         self.save_log()

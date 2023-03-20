@@ -30,11 +30,18 @@ class MAML:
         self.query_loaders:list[DataLoader] = query_loaders
         self.outer_opt = torch.optim.Adam(self.model.parameters(), lr=global_lr)
 
+    def _inner_loop(self, model, batch, loss_fn):
+        X, y = batch[0], batch[1]
+        pred = model(X)
+        loss = loss_fn(pred, y)
+        return loss, (pred.argmax(1) == y).type(torch.float).sum().item()
+
     def _outer_loop(self, epoch:int, is_train:bool=True):
         self.model.train()
         tasks_per_round = 5
         count = 0
         num_batch_task = ceil(len(self.support_loaders)/tasks_per_round)
+        loss_fn = torch.nn.CrossEntropyLoss()
 
         # lặp qua tất cả các batch task
         for batch_task_idx in range(num_batch_task):
@@ -51,17 +58,17 @@ class MAML:
 
                 with higher.innerloop_ctx(self.model, inner_opt, copy_initial_weights=False) as (fmodel, diffopt):
                     for _ in range(self.local_epochs):
-                        for X, y in self.support_loaders[task_idx]:
-                            support_pred = fmodel(X)
-                            support_loss = F.cross_entropy(support_pred, y)
+                        for batch in self.support_loaders[task_idx]:
+                            # support_pred = fmodel(X)
+                            support_loss, _ = self._inner_loop(fmodel, batch, loss_fn)
                             diffopt.step(support_loss)
 
                     correct = 0.
-                    for X, y in self.query_loaders[task_idx]:
-                        query_pred = fmodel(X)
-                        query_loss = F.cross_entropy(query_pred, y)
+                    for batch in self.query_loaders[task_idx]:
+                        # query_pred = fmodel(X)
+                        query_loss, correct = self._inner_loop(fmodel, batch, loss_fn)
                         outer_loss += query_loss
-                        correct = (query_pred.argmax(1) == y).type(torch.float).sum().item()
+                        # correct = (query_pred.argmax(1) == y).type(torch.float).sum().item()
 
                     # log info for this task
                     accuracies.append(correct/len(self.query_loaders[task_idx].dataset))

@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data import DataLoader
 from learn2learn.algorithms import MAML
+import higher
 
 from .base_client import BaseClient
 
@@ -25,64 +26,55 @@ class FedMAMLClient(BaseClient):
         self.test_query_loader: DataLoader = test_query_loader
 
     def test(self):
-        # create meta model
-        meta_model: MAML = MAML(self.model, lr=self.local_lr, first_order=False)
-        loss_fn = torch.nn.CrossEntropyLoss()
-
-        # adapt
-        learner:MAML = meta_model.clone()
-
-        for _ in range(self.local_epochs):
+        inner_opt = torch.optim.Adam(self.model.parameters(), lr=self.local_lr)
+        with higher.innerloop_ctx(self.model, inner_opt, self.device, copy_initial_weights=False) as (fmodel, diffopt):
             for batch in self.test_support_loader:
-                support_loss, _ = self._training_step(batch, learner, loss_fn)
-                learner.adapt(support_loss)
+                support_loss, _ = self._training_step(batch, fmodel)
+                diffopt.step(support_loss)
 
-        testing_loss = 0.
-        correct = 0.
-        num_sample = len(self.test_query_loader.dataset)
-        for batch in self.test_query_loader:
-            query_loss, correct_ = self._training_step(batch, learner, loss_fn)
+            outer_loss = 0.
+            correct = 0.
+            num_sample = len(self.test_query_loader.dataset)
+            for batch in self.test_query_loader:
+                query_loss, query_correct = self._training_step(batch, fmodel)
 
-            correct += correct_
-            testing_loss += query_loss.item()
+                correct += query_correct
+                outer_loss += query_loss.item()
 
-        return testing_loss, correct/num_sample
+        return outer_loss, correct/num_sample
 
-    def train(self):
-        print(f'Client {self.id}: Training MAML client')
+    def _outer_loop(self):
+        outer_opt = torch.optim.Adam(self.model.parameters(), lr=self.global_lr)
+        outer_opt.zero_grad()
 
-        # create meta model
-        meta_model: MAML = MAML(self.model, lr=self.local_lr, first_order=False)
-        optimizer = torch.optim.SGD(meta_model.parameters(), self.global_lr)
-        loss_fn = torch.nn.CrossEntropyLoss()
+        inner_opt = torch.optim.Adam(self.model.parameters(), lr=self.local_lr)
+        with higher.innerloop_ctx(self.model, inner_opt, self.device, copy_initial_weights=False) as (fmodel, diffopt):
+            num_batch = len(self.training_loader)
+            for _ in range(self.local_epochs):
+                for idx, batch in enumerate(self.training_loader):
+                    if idx <= 0.2*num_batch:
+                        support_loss, _ = self._training_step(batch, fmodel)
+                        diffopt.step(support_loss)
 
-        # run 1 round (#outer_loop=1)
-        learner:MAML = meta_model.clone()
-
-        num_batch = len(self.training_loader)
-        for _ in range(self.local_epochs):
+            outer_loss = 0.
+            correct = 0.
+            num_sample = 0
             for idx, batch in enumerate(self.training_loader):
-                if idx <= 0.2*num_batch:
-                    support_loss, _ = self._training_step(batch, learner, loss_fn)
-                    learner.adapt(support_loss)
+                if idx > 0.2*num_batch or num_batch == 1:
+                    query_loss, query_correct = self._training_step(batch, fmodel)
 
-        training_loss = 0.
-        correct = 0.
-        num_sample = 0
-        for idx, batch in enumerate(self.training_loader):
-            if idx > 0.2*num_batch or num_batch == 1:
-                query_loss, correct_ = self._training_step(batch, learner, loss_fn)
+                    outer_loss += query_loss
+                    num_sample += len(batch[0])
+                    correct += query_correct
 
-                num_sample += len(batch[0])
-                correct += correct_
-                training_loss += query_loss
-
-        optimizer.zero_grad()
-        training_loss.backward()
-        optimizer.step()
+        outer_loss.backward()
+        outer_opt.step()
 
         self.num_training_sample = num_sample
 
-        return training_loss.item(), correct/num_sample
+        print(f'MAML client {self.id}: Training loss = {outer_loss.item():.7f}, Training acc = {correct/num_sample*100:.2f}%')
 
+        return outer_loss.item(), correct/num_sample
 
+    def train(self):
+        return self._outer_loop()
