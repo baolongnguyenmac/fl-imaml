@@ -33,14 +33,14 @@ class FedMAMLClient(BaseClient):
         learner:MAML = meta_model.clone()
 
         for _ in range(self.local_epochs):
-            for idx, batch in enumerate(self.test_support_loader):
+            for batch in self.test_support_loader:
                 support_loss, _ = self._training_step(batch, learner, loss_fn)
                 learner.adapt(support_loss)
 
         testing_loss = 0.
         correct = 0.
         num_sample = len(self.test_query_loader.dataset)
-        for idx, batch in enumerate(self.test_query_loader):
+        for batch in self.test_query_loader:
             query_loss, correct_ = self._training_step(batch, learner, loss_fn)
 
             correct += correct_
