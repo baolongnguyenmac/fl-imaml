@@ -1,6 +1,7 @@
+# Ref: https://github.com/sshkhr/imaml
+
 import torch
 from torch.utils.data import DataLoader
-from learn2learn.algorithms import MAML
 import higher
 
 from .base_client import BaseClient
@@ -45,9 +46,8 @@ class FedMAMLClient(BaseClient):
 
     def _outer_loop(self):
         outer_opt = torch.optim.Adam(self.model.parameters(), lr=self.global_lr)
-        outer_opt.zero_grad()
-
         inner_opt = torch.optim.Adam(self.model.parameters(), lr=self.local_lr)
+
         with higher.innerloop_ctx(self.model, inner_opt, self.device, copy_initial_weights=False) as (fmodel, diffopt):
             num_batch = len(self.training_loader)
             for _ in range(self.local_epochs):
@@ -67,6 +67,7 @@ class FedMAMLClient(BaseClient):
                     num_sample += len(batch[0])
                     correct += query_correct
 
+        outer_opt.zero_grad()
         outer_loss.backward()
         outer_opt.step()
 
