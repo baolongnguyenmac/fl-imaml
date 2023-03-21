@@ -5,6 +5,7 @@ import torch
 from data.mnist_loader import get_loader as m_loader
 from server.fedavg_server import FedAvgServer
 from server.fedmaml_server import FedMAMLServer
+from server.fedimaml_server import FediMAMLServer
 from model.mnist_model import Mnist
 
 MNIST_DATA = MNIST_MODEL = 'mnist'
@@ -79,7 +80,20 @@ def get_server(args: argparse.Namespace, command:dict):
             test_query_loaders=test_query_loaders,
             command=command)
     elif algo == FED_IMAML:
-        pass
+        return FediMAMLServer(
+            global_epochs=args.global_epochs,
+            local_epochs=args.local_epochs,
+            device=device,
+            global_lr=args.global_lr,
+            local_lr=args.local_lr,
+            model=config_model(args.model).to(device),
+            num_activated_clients=args.clients_per_round,
+            training_loaders=train_loaders,
+            test_support_loaders=test_support_loaders,
+            test_query_loaders=test_query_loaders,
+            command=command,
+            lambda_=args.lambda_,
+            cg_step=args.cg_step)
     else:
         print('meo')
 
@@ -95,6 +109,8 @@ def main():
     parser.add_argument("--model", type=str, required=True, help="Model", choices=[MNIST_MODEL, CIFAR_MODEL], default='mnist')
     parser.add_argument("--algorithm", type=str, required=True, help="Algorithm", choices=[FED_AVG, FED_MAML, FED_IMAML], default='fed_avg')
     parser.add_argument("--clients_per_round", type=int, required=True, help="Number of client evolving in training each round", default=5)
+    parser.add_argument("--lambda_", type=float, required=False, help="Regularization hyper-param", default=100.)
+    parser.add_argument("--cg_step", type=int, required=False, help="Conjugate step", default=5)
 
     args = parser.parse_args()
     command:dict = vars(args)
