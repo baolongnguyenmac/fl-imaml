@@ -1,5 +1,6 @@
 import torch
 from torch.utils.data import DataLoader
+from torch.nn.utils import parameters_to_vector
 from copy import deepcopy
 import higher
 import numpy as np
@@ -10,7 +11,31 @@ import os
 from math import ceil
 import torch.nn.functional as F
 
-class MAML:
+def apply_grad(model, grad):
+    '''
+    assign gradient to model(nn.Module) instance. return the norm of gradient
+    '''
+    grad_norm = 0
+    for p, g in zip(model.parameters(), grad):
+        if p.grad is None:
+            p.grad = g
+        else:
+            p.grad += g
+        grad_norm += torch.sum(g**2)
+    grad_norm = grad_norm ** (1/2)
+    return grad_norm.item()
+
+def mix_grad(grad_list):
+    '''
+    calc weighted average of gradient
+    '''
+    mixed_grad = []
+    for g_list in zip(*grad_list):
+        g_list = torch.stack([g_list[i] for i in range(len(grad_list))])
+        mixed_grad.append(torch.sum(g_list, dim=0))
+    return mixed_grad
+
+class iMAML:
     def __init__(
             self,
             global_epochs:int,
@@ -19,7 +44,9 @@ class MAML:
             local_lr:float,
             model:torch.nn.Module,
             support_loaders:list[DataLoader],
-            query_loaders:list[DataLoader]
+            query_loaders:list[DataLoader],
+            lambda_:float,
+            n_cg:int
         ) -> None:
 
         self.global_epochs:int = global_epochs
@@ -29,6 +56,8 @@ class MAML:
         self.support_loaders:list[DataLoader] = support_loaders
         self.query_loaders:list[DataLoader] = query_loaders
         self.outer_opt = torch.optim.Adam(self.model.parameters(), lr=global_lr)
+        self.lambda_:float = lambda_
+        self.n_cg:int = n_cg
 
     def _inner_loop(self, model, batch, loss_fn):
         X, y = batch[0], batch[1]
@@ -36,8 +65,41 @@ class MAML:
         loss = loss_fn(pred, y)
         return loss, (pred.argmax(1) == y).type(torch.float).sum().item()
 
+    def loss_fn(self, pred:list[torch.Tensor], y:list[torch.Tensor], local_params:list[torch.Tensor], global_params:list[torch.Tensor]):
+        return F.cross_entropy(pred, y) + self.lambda_/2 * sum([((gp - lp) ** 2).sum() for gp, lp in zip(global_params, local_params)])
+
+    @torch.no_grad()
+    def cg(self, in_grad, outer_grad, params):
+        x = outer_grad.clone().detach()
+        r = outer_grad.clone().detach() - self.hv_prod(in_grad, x, params)
+        p = r.clone().detach()
+        for i in range(self.n_cg):
+            Ap = self.hv_prod(in_grad, p, params)
+            alpha = (r @ r)/(p @ Ap)
+            x = x + alpha * p
+            r_new = r - alpha * Ap
+            beta = (r_new @ r_new)/(r @ r)
+            p = r_new + beta * p
+            r = r_new.clone().detach()
+        return self.vec_to_grad(x)
+
+    def vec_to_grad(self, vec):
+        pointer = 0
+        res = []
+        for param in self.model.parameters():
+            num_param = param.numel()
+            res.append(vec[pointer:pointer+num_param].view_as(param).data)
+            pointer += num_param
+        return res
+
+    @torch.enable_grad()
+    def hv_prod(self, in_grad, x, params):
+        hv = torch.autograd.grad(in_grad, params, retain_graph=True, grad_outputs=x)
+        hv = torch.nn.utils.parameters_to_vector(hv).detach()
+        # precondition with identity matrix
+        return hv/self.lambda_ + x
+
     def _outer_loop(self, epoch:int, is_train:bool=True):
-        self.model.train()
         tasks_per_round = 5
         count = 0
         num_batch_task = ceil(len(self.support_loaders)/tasks_per_round)
@@ -45,11 +107,12 @@ class MAML:
 
         # lặp qua tất cả các batch task
         for batch_task_idx in range(num_batch_task):
+            inner_loss = 0.
             outer_loss = 0.
-            self.outer_opt.zero_grad()
             inner_opt = torch.optim.Adam(self.model.parameters(), lr=self.local_lr)
 
             accuracies = []
+            grad_list = []
 
             # lặp qua tất cả các task trong batch_task
             for task_idx in range(count, count + tasks_per_round):
@@ -59,16 +122,24 @@ class MAML:
                 with higher.innerloop_ctx(self.model, inner_opt, copy_initial_weights=False) as (fmodel, diffopt):
                     for _ in range(self.local_epochs):
                         for batch in self.support_loaders[task_idx]:
-                            # support_pred = fmodel(X)
                             support_loss, _ = self._inner_loop(fmodel, batch, loss_fn)
                             diffopt.step(support_loss)
 
+                        for batch in self.support_loaders[task_idx]:
+                            support_loss, _ = self._inner_loop(fmodel, batch, loss_fn)
+                            inner_loss += support_loss
+
                     correct = 0.
                     for batch in self.query_loaders[task_idx]:
-                        # query_pred = fmodel(X)
                         query_loss, correct = self._inner_loop(fmodel, batch, loss_fn)
                         outer_loss += query_loss
-                        # correct = (query_pred.argmax(1) == y).type(torch.float).sum().item()
+
+                    if is_train:
+                        params = list(fmodel.parameters())
+                        inner_grad = parameters_to_vector(torch.autograd.grad(inner_loss, params, create_graph=True))
+                        outer_grad = parameters_to_vector(torch.autograd.grad(outer_loss, params))
+                        implicit_grad = self.cg(inner_grad, outer_grad, params)
+                        grad_list.append(implicit_grad)
 
                     # log info for this task
                     accuracies.append(correct/len(self.query_loaders[task_idx].dataset))
@@ -76,7 +147,9 @@ class MAML:
 
             mean_acc, std = np.mean(accuracies)*100, np.std(accuracies)*100
             if is_train:
-                outer_loss.backward()
+                self.outer_opt.zero_grad()
+                grad = mix_grad(grad_list)
+                apply_grad(self.model, grad)
                 self.outer_opt.step()
                 print(f'\n[Epoch {epoch}]: Training loss = {outer_loss.item():0.5f}, Training acc = {mean_acc:.2f}±{std:.2f}%\n')
             else:
@@ -109,5 +182,5 @@ if __name__=='__main__':
         else:
             support_loaders.append(loader)
 
-    learner = MAML(15, 2, 0.001, 0.001, Mnist(), support_loaders, query_loaders)
+    learner = iMAML(15, 2, 0.001, 0.001, Mnist(), support_loaders, query_loaders, 100., 5)
     learner.train()

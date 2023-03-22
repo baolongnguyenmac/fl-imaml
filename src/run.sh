@@ -1,1 +1,1 @@
-python main.py --global_epochs=15 --global_lr=0.001 --local_epochs=2 --local_lr=0.001 --dataset='mnist' --model='mnist' --algorithm='fed_maml' --clients_per_round=5
+python main.py --global_epochs=15 --global_lr=0.001 --local_epochs=2 --local_lr=0.001 --dataset='mnist' --model='mnist' --algorithm='fed_imaml' --clients_per_round=5 --lambda_=100 --cg_step=5

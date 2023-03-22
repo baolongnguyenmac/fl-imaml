@@ -2,11 +2,26 @@
 
 import torch
 from torch.utils.data import DataLoader
+from torch.nn.utils import parameters_to_vector
 import higher
 
 from .base_client import BaseClient
 
-class FedMAMLClient(BaseClient):
+def apply_grad(model:torch.nn.Module, grad:list[torch.Tensor]):
+    '''
+    assign gradient to model(nn.Module) instance. return the norm of gradient
+    '''
+    grad_norm = 0
+    for p, g in zip(model.parameters(), grad):
+        if p.grad is None:
+            p.grad = g
+        else:
+            p.grad += g
+        grad_norm += torch.sum(g**2)
+    grad_norm = grad_norm ** (1/2)
+    return grad_norm.item()
+
+class FediMAMLClient(BaseClient):
     def __init__(
             self,
             local_epochs: int,
@@ -18,13 +33,17 @@ class FedMAMLClient(BaseClient):
             training_loader: DataLoader = None,
             test_support_loader: DataLoader = None,
             test_query_loader: DataLoader = None,
+            lambda_: float = 100.,
+            cg_step: int = 5
         ) -> None:
-        # in meta client: loader means training_loader
         super().__init__(local_epochs, local_lr, model, device, id)
         self.global_lr = global_lr
         self.training_loader: DataLoader = training_loader
         self.test_support_loader: DataLoader = test_support_loader
         self.test_query_loader: DataLoader = test_query_loader
+
+        self.lambda_:float = lambda_
+        self.cg_step:int = cg_step
 
     def test(self):
         inner_opt = torch.optim.Adam(self.model.parameters(), lr=self.local_lr)
@@ -44,6 +63,37 @@ class FedMAMLClient(BaseClient):
 
         return outer_loss, correct/num_sample
 
+    @torch.no_grad()
+    def conjugate_grad(self, inner_grad:torch.Tensor, outer_grad:torch.Tensor, params:list[torch.Tensor]):
+        x = outer_grad.clone().detach()
+        r = outer_grad.clone().detach() - self.hv_prod(inner_grad, x, params)
+        p = r.clone().detach()
+        for i in range(self.cg_step):
+            Ap = self.hv_prod(inner_grad, p, params)
+            alpha = (r @ r)/(p @ Ap)
+            x = x + alpha * p
+            r_new = r - alpha * Ap
+            beta = (r_new @ r_new)/(r @ r)
+            p = r_new + beta * p
+            r = r_new.clone().detach()
+        return self.vec_to_grad(x)
+
+    def vec_to_grad(self, vec:torch.Tensor):
+        pointer = 0
+        res = []
+        for param in self.model.parameters():
+            num_param = param.numel()
+            res.append(vec[pointer:pointer+num_param].view_as(param).data)
+            pointer += num_param
+        return res
+
+    @torch.enable_grad()
+    def hv_prod(self, inner_grad:torch.Tensor, x:torch.Tensor, params):
+        hv = torch.autograd.grad(inner_grad, params, retain_graph=True, grad_outputs=x)
+        hv = torch.nn.utils.parameters_to_vector(hv).detach()
+        # precondition with identity matrix
+        return hv/self.lambda_ + x
+
     def _outer_loop(self):
         outer_opt = torch.optim.Adam(self.model.parameters(), lr=self.global_lr)
         inner_opt = torch.optim.Adam(self.model.parameters(), lr=self.local_lr)
@@ -56,6 +106,12 @@ class FedMAMLClient(BaseClient):
                         support_loss, _ = self._training_step(batch, fmodel)
                         diffopt.step(support_loss)
 
+            inner_loss = 0.
+            for idx, batch in enumerate(self.training_loader):
+                if idx <= 0.2*num_batch:
+                    support_loss, _ = self._training_step(batch, fmodel)
+                    inner_loss += support_loss
+
             outer_loss = 0.
             correct = 0.
             num_sample = 0
@@ -64,16 +120,21 @@ class FedMAMLClient(BaseClient):
                     query_loss, query_correct = self._training_step(batch, fmodel)
 
                     outer_loss += query_loss
-                    num_sample += len(batch[0])
                     correct += query_correct
+                    num_sample += len(batch[0])
+
+            params = list(fmodel.parameters())
+            inner_grad = parameters_to_vector(torch.autograd.grad(inner_loss, params, create_graph=True))
+            outer_grad = parameters_to_vector(torch.autograd.grad(outer_loss, params))
+            implicit_grad = self.conjugate_grad(inner_grad, outer_grad, params)
 
         outer_opt.zero_grad()
-        outer_loss.backward()
+        apply_grad(self.model, implicit_grad)
         outer_opt.step()
 
         self.num_training_sample = num_sample
 
-        print(f'MAML client {self.id}: Training loss = {outer_loss.item():.7f}, Training acc = {correct/num_sample*100:.2f}%')
+        print(f'iMAML client {self.id}: Training loss = {outer_loss.item():.7f}, Training acc = {correct/num_sample*100:.2f}%')
 
         return outer_loss.item(), correct/num_sample
 

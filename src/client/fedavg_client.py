@@ -21,11 +21,8 @@ class FedAvgClient(BaseClient):
 
     def train(self):
         optimizer = torch.optim.SGD(self.model.parameters(), lr=self.local_lr)
-        optimizer.zero_grad()
-
         num_sample = len(self.training_loader.dataset)
 
-        self.model.train()
         for _ in range(self.local_epochs):
             training_loss, correct = 0., 0.
             for batch in self.training_loader:
@@ -49,7 +46,6 @@ class FedAvgClient(BaseClient):
         num_sample = len(self.testing_loader.dataset)
         testing_loss, correct = 0., 0.
 
-        self.model.eval()
         with torch.no_grad():
             for batch in self.testing_loader:
                 loss, correct_ = self._training_step(batch, self.model)
