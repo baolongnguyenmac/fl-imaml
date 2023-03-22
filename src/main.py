@@ -52,6 +52,7 @@ def get_server(args: argparse.Namespace, command:dict):
     print('\nPreparing server ...')
     train_loaders, test_support_loaders, test_query_loaders = config_dataset(args.dataset)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f'\nUsing {device.type}')
 
     algo = args.algorithm
     if algo == FED_AVG:
