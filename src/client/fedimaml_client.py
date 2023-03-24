@@ -1,5 +1,6 @@
 # Ref: https://github.com/sshkhr/imaml
 
+from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader
 from torch.nn.utils import parameters_to_vector
@@ -134,7 +135,7 @@ class FediMAMLClient(BaseClient):
 
         self.num_training_sample = num_sample
 
-        print(f'iMAML client {self.id}: Training loss = {outer_loss.item():.7f}, Training acc = {correct/num_sample*100:.2f}%')
+        tqdm.write(f'iMAML client {self.id}: Training loss = {outer_loss.item():.7f}, Training acc = {correct/num_sample*100:.2f}%')
 
         return outer_loss.item(), correct/num_sample
 

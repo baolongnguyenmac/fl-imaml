@@ -1,3 +1,4 @@
+from tqdm import tqdm, trange
 import torch
 from torch.nn.parameter import Parameter
 import numpy as np
@@ -46,7 +47,7 @@ class BaseServer:
             global_p.data += local_p.data.clone()*ratio
 
     def _aggregate(self):
-        print('Aggregate local model of base clients')
+        tqdm.write('Aggregate local model of base clients')
         total_sample = 0
         for client in self.selected_clients:
             total_sample += client.num_training_sample
@@ -60,7 +61,7 @@ class BaseServer:
         return np.mean(array), np.std(array)
 
     def test(self, round:int):
-        print(f'\nRun test on {len(self.testing_clients)} clients')
+        tqdm.write(f'\nRun test on {len(self.testing_clients)} clients')
         self._distribute_model(self.testing_clients)
         losses = []
         accs = []
@@ -74,7 +75,7 @@ class BaseServer:
         self.test_log['accs'][round], self.test_log['std_accs'][round] = self.compute_mean_std(accs)
 
     def _distribute_model(self, list_clients:list[BaseClient]):
-        print('Distribute global model')
+        tqdm.write('Distribute global model')
         for client in list_clients:
             client._set_param(self.model)
 
@@ -92,25 +93,26 @@ class BaseServer:
         self._aggregate()
 
     def train(self):
-        for r in range(self.global_epochs):
-            print(f'\n============= Round {r} =============\n')
+        t = trange(self.global_epochs, desc='Train')
+        for r in t:
+            tqdm.write(f'\n============= Round {r} =============\n')
             # train global model using a batch of clients
             self.selected_clients:list[BaseClient] = np.random.choice(self.training_clients, self.num_activated_clients, replace=False)
             self._distribute_model(self.selected_clients)
             self._training_step(r)
-            print(f"[Train] Loss: {self.train_log['losses'][r]:.7f}, Acc: {self.train_log['accs'][r]*100:.2f}±{self.train_log['std_accs'][r]*100:.2f}%")
+            tqdm.write(f"[Train] Loss: {self.train_log['losses'][r]:.7f}, Acc: {self.train_log['accs'][r]*100:.2f}±{self.train_log['std_accs'][r]*100:.2f}%")
 
             # evaluate global model each 20 rounds
             if (r+1)%5 == 0 or r == 0:
                 self.test(r)
-                print(f"[Test] Loss: {self.test_log['losses'][r]:.7f}, Acc: {self.test_log['accs'][r]*100:.2f}±{self.test_log['std_accs'][r]*100:.2f}%")
+                tqdm.write(f"[Test] Loss: {self.test_log['losses'][r]:.7f}, Acc: {self.test_log['accs'][r]*100:.2f}±{self.test_log['std_accs'][r]*100:.2f}%")
 
         # save log to ./experiment
         self.save_log()
 
     def save_log(self):
         dir_ = join('../experiment', datetime.today().strftime('%Y-%m-%d'))
-        print(f'\nWrite log to {dir_}')
+        tqdm.write(f'\nWrite log to {dir_}')
 
         if not isdir(dir_):
             mkdir(dir_)

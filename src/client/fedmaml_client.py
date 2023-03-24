@@ -1,5 +1,6 @@
 # Ref: https://github.com/sshkhr/imaml
 
+from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader
 import higher
@@ -73,7 +74,7 @@ class FedMAMLClient(BaseClient):
 
         self.num_training_sample = num_sample
 
-        print(f'MAML client {self.id}: Training loss = {outer_loss.item():.7f}, Training acc = {correct/num_sample*100:.2f}%')
+        tqdm.write(f'MAML client {self.id}: Training loss = {outer_loss.item():.7f}, Training acc = {correct/num_sample*100:.2f}%')
 
         return outer_loss.item(), correct/num_sample
 

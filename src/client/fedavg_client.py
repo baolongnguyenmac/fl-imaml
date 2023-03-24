@@ -1,3 +1,4 @@
+from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader
 
@@ -38,7 +39,7 @@ class FedAvgClient(BaseClient):
 
         self.num_training_sample = num_sample
 
-        print(f'Base client {self.id}: Training loss = {training_loss:.7f}, Training acc = {correct/num_sample*100:.2f}%')
+        tqdm.write(f'Base client {self.id}: Training loss = {training_loss:.7f}, Training acc = {correct/num_sample*100:.2f}%')
 
         return training_loss, correct/num_sample
 

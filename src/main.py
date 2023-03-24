@@ -3,6 +3,7 @@ import os
 import torch
 
 from data.mnist_loader import get_loader as m_loader
+from data.cifar_loader import get_loader as c_loader
 from server.fedavg_server import FedAvgServer
 from server.fedmaml_server import FedMAMLServer
 from server.fedimaml_server import FediMAMLServer
@@ -29,6 +30,7 @@ def config_dataset(dataset:str):
     elif dataset == CIFAR_DATA:
         train_dir = '../data/cifar/client_train'
         test_dir = '../data/cifar/client_test'
+        loader = c_loader
 
     for train_file in os.listdir(train_dir):
         train_loaders.append(loader(os.path.join(train_dir, train_file)))
@@ -111,8 +113,8 @@ def main():
     parser.add_argument("--model", type=str, required=True, help="Model", choices=[MNIST_MODEL, CIFAR_MODEL], default='mnist')
     parser.add_argument("--algorithm", type=str, required=True, help="Algorithm", choices=[FED_AVG, FED_MAML, FED_IMAML], default='fed_avg')
     parser.add_argument("--clients_per_round", type=int, required=True, help="Number of client evolving in training each round", default=5)
-    parser.add_argument("--lambda_", type=float, required=False, help="Regularization hyper-param", default=100.)
-    parser.add_argument("--cg_step", type=int, required=False, help="Conjugate step", default=5)
+    parser.add_argument("--lambda_", type=float, required=False, help="Regularization hyper-param")
+    parser.add_argument("--cg_step", type=int, required=False, help="Conjugate step")
 
     args = parser.parse_args()
     command:dict = vars(args)
