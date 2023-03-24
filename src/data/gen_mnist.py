@@ -1,3 +1,5 @@
+import torchvision
+import torchvision.transforms as transforms
 import numpy as np
 import pandas as pd
 from typing import Tuple
@@ -9,46 +11,44 @@ import shutil
 np.random.seed(69)
 
 
-def redivide_data(dir: str):
-    print('ReDivide: 75% training data, 25% testing data')
-    data_path = join(dir, './mnist.csv')
-    if not isfile(data_path):
-        print(f'\tCreate {data_path}')
-        df_test: pd.DataFrame = pd.read_csv(join(dir, './mnist_test.csv'))
-        df_train: pd.DataFrame = pd.read_csv(join(dir, './mnist_train.csv'))
-        df = pd.concat([df_train, df_test], axis=0)
-        np.random.shuffle(df.values)
-        df.to_csv(data_path, index=False)
+def redivide_data(dir:str, transform:transforms.Compose, dataset:str='mnist'):
+    print('\nReDivide: 75% training data, 25% testing data')
+
+    # download dataset
+    if dataset == 'mnist':
+        train_set = torchvision.datasets.MNIST(root=dir, train=True, download=True, transform=transform)
+        test_set = torchvision.datasets.MNIST(root=dir, train=False, download=True, transform=transform)
+    elif dataset == 'cifar':
+        train_set = torchvision.datasets.CIFAR10(root=dir, train=True, download=True, transform=transform)
+        test_set = torchvision.datasets.CIFAR10(root=dir, train=False, download=True, transform=transform)
     else:
-        print(f'\tRead {data_path}')
-        df = pd.read_csv(data_path)
+        print('meo')
+        return
 
-    total_len = df.shape[0]
-    df_test = df.iloc[:int(total_len*0.25),:]
-    df_train = df.iloc[int(total_len*0.25):,:]
+    # concat
+    if dataset == 'mnist':
+        X = np.concatenate((train_set.data, test_set.data)).reshape(-1, 28*28)/255.
+    elif dataset == 'cifar':
+        X = np.concatenate((train_set.data, test_set.data)).reshape(-1, 32*32*3)/255.
+    y = np.concatenate((train_set.targets, test_set.targets))
 
-    print('\tWrite file')
-    df_test.to_csv(join(dir, './mnist_test_25.csv'), index=False)
-    df_train.to_csv(join(dir, './mnist_train_75.csv'), index=False)
+    # shuffle
+    index_array = np.arange(len(y))
+    np.random.shuffle(index_array)
+    X = X[index_array]
+    y = y[index_array]
 
-    print(df_test.shape, df_train.shape)
-
-
-def get_X_y(data_path) -> Tuple[np.ndarray, np.ndarray]:
-    print('\nRead data')
-    raw_data = (pd.read_csv(data_path)).to_numpy()
-
-    print('\nNormalize data')
-    X = raw_data[:, 1:]/255
-    y = raw_data[:, 0]
-
-    print(X.shape, y.shape)
-    return X, y
+    # redivide
+    X_train, y_train = X[int(0.25*len(y)):], y[int(0.25*len(y)):]
+    X_test, y_test = X[:int(0.25*len(y))], y[:int(0.25*len(y))]
+    print(X_train.shape, y_train.shape)
+    print(X_test.shape, y_test.shape)
+    return X_train, y_train, X_test, y_test
 
 
-def get_data_by_label(X: np.array, y: np.array) -> list[np.ndarray]:
+def get_data_by_label(X: np.array, y: np.array, num_label=10) -> list[np.ndarray]:
     data_by_label = []
-    for label in range(0, 10):
+    for label in range(num_label):
         data_by_label.append(X[y == label][:, :])
         # shuffle to have client with different data after generating
         np.random.shuffle(data_by_label[-1])
@@ -114,8 +114,7 @@ def divide_data_for_clients(
                 all_user[f'{i}_s'][int(label)] = data_by_label[label][start:start+int(num_sample*0.2)].tolist()
                 all_user[f'{i}_q'][int(label)] = data_by_label[label][start+int(num_sample*0.2):end].tolist()
             else:
-                all_user[i][int(
-                    label)] = data_by_label[label][start:end].tolist()
+                all_user[i][int(label)] = data_by_label[label][start:end].tolist()
 
             flag1[label] = end
             flag2[label] += 1
@@ -136,30 +135,31 @@ def vis_sample(data_by_label: list[np.ndarray]):
     plt.show()
 
 
-def gen_mnist(dir='./data/mnist/'):
+def gen_mnist(
+        dir='./data/mnist/',
+        num_training_clients=50,
+        num_testing_clients=30,
+        num_labels=10,
+        num_labels_per_client=2
+    ):
     """generate data for non-iid scenario (no local client for testing)
     """
     print('\n=========== Generating data ===========')
 
-    num_training_clients = 50
-    num_testing_clients = 30
-    num_labels = 10
-    num_labels_per_client = 2
-
     training_intervals = int(num_training_clients/num_labels*num_labels_per_client)
     testing_intervals = int(num_testing_clients/num_labels*num_labels_per_client)
 
-    if not isfile(join(dir, 'mnist.csv')):
-        redivide_data(dir)
-
     print('\nCreate training data')
-    X_train, y_train = get_X_y(join(dir, 'mnist_train_75.csv'))
+    transform=transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,))
+    ])
+    X_train, y_train, X_test, y_test = redivide_data('./data/mnist/', transform=transform, dataset='mnist')
     data_train_by_label = get_data_by_label(X_train, y_train)
     num_train_sample_in_label = divide_num_sample_into_intervals(data_train_by_label, training_intervals, num_labels)
     all_user_train = divide_data_for_clients(data_train_by_label, num_train_sample_in_label, list(range(10)), num_training_clients, False)
 
     print('\nCreate testing data')
-    X_test, y_test = get_X_y(join(dir, 'mnist_test_25.csv'))
     data_test_by_label = get_data_by_label(X_test, y_test)
     num_test_sample_in_label = divide_num_sample_into_intervals(data_test_by_label, testing_intervals, num_labels)
     all_user_test = divide_data_for_clients(data_test_by_label, num_test_sample_in_label, list(range(10)), num_testing_clients)
