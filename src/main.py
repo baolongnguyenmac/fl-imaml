@@ -7,6 +7,7 @@ from server.fedavg_server import FedAvgServer
 from server.fedmaml_server import FedMAMLServer
 from server.fedimaml_server import FediMAMLServer
 from model.mnist_model import Mnist
+from model.cifar_model import Cifar
 
 MNIST_DATA = MNIST_MODEL = 'mnist'
 CIFAR_DATA = CIFAR_MODEL = 'cifar'
@@ -46,7 +47,7 @@ def config_model(model:str):
     if model == MNIST_MODEL:
         return Mnist()
     elif model == CIFAR_MODEL:
-        pass
+        return Cifar()
 
 def get_server(args: argparse.Namespace, command:dict):
     print('\nPreparing server ...')

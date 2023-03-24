@@ -10,7 +10,7 @@ np.random.seed(69)
 from .gen_mnist import divide_data_for_clients, divide_num_sample_into_intervals, get_data_by_label, redivide_data
 
 def gen_cifar(
-        dir='./data/cifar',
+        dir='../data/cifar',
         num_training_clients=50,
         num_testing_clients=30,
         num_labels=10,
@@ -28,7 +28,7 @@ def gen_cifar(
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
-    X_train, y_train, X_test, y_test = redivide_data('./data/cifar/', transform=transform, dataset='cifar')
+    X_train, y_train, X_test, y_test = redivide_data(dir, transform=transform, dataset='cifar')
     data_train_by_label = get_data_by_label(X_train, y_train)
     num_train_sample_in_label = divide_num_sample_into_intervals(data_train_by_label, training_intervals, num_labels)
     all_user_train = divide_data_for_clients(data_train_by_label, num_train_sample_in_label, list(range(10)), num_training_clients, False)
