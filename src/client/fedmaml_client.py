@@ -30,9 +30,10 @@ class FedMAMLClient(BaseClient):
     def test(self):
         inner_opt = torch.optim.Adam(self.model.parameters(), lr=self.local_lr)
         with higher.innerloop_ctx(self.model, inner_opt, self.device, copy_initial_weights=False) as (fmodel, diffopt):
-            for batch in self.test_support_loader:
-                support_loss, _ = self._training_step(batch, fmodel)
-                diffopt.step(support_loss)
+            for _ in range(self.local_epochs):
+                for batch in self.test_support_loader:
+                    support_loss, _ = self._training_step(batch, fmodel)
+                    diffopt.step(support_loss)
 
             outer_loss = 0.
             correct = 0.
