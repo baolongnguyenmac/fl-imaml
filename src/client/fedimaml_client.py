@@ -5,6 +5,7 @@ import torch
 from torch.utils.data import DataLoader
 from torch.nn.utils import parameters_to_vector
 import higher
+import torch.nn.functional as F
 
 from .base_client import BaseClient
 
@@ -94,6 +95,16 @@ class FediMAMLClient(BaseClient):
         hv = torch.nn.utils.parameters_to_vector(hv).detach()
         # precondition with identity matrix
         return hv/self.lambda_ + x
+
+    def loss_fn(self, pred:list[torch.Tensor], y:list[torch.Tensor], local_params:list[torch.Tensor], global_params:list[torch.Tensor]):
+        return F.cross_entropy(pred, y) + self.lambda_/2 * sum([((lp - gp) ** 2).sum() for gp, lp in zip(global_params, local_params)])
+
+    def _training_step(self, batch:list, model:torch.nn.Module):
+        X, y = batch[0].to(self.device), batch[1].to(self.device)
+        pred = model(X)
+        loss = self.loss_fn(pred, y, list(model.parameters()), list(self.model.parameters()))
+        correct = (pred.argmax(1) == y).type(torch.float).sum().item()
+        return loss, correct
 
     def _outer_loop(self):
         outer_opt = torch.optim.Adam(self.model.parameters(), lr=self.global_lr)
