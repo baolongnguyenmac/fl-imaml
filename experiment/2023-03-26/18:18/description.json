@@ -1,0 +1,1 @@
+{"global_epochs": 200, "global_lr": 0.001, "local_epochs": 10, "local_lr": 0.001, "dataset": "mnist", "model": "mnist", "algorithm": "fed_imaml", "clients_per_round": 5, "lambda_": 100.0, "cg_step": 10, "note": "enter your note"}

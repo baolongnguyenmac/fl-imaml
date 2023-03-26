@@ -1,3 +1,0 @@
-tạo đường dẫn theo mẫu:
-    - "./1.10_03_2023/run.sh"
-    - "./1.10_03_2023/<kết quả thí nghiệm các thứ>"
