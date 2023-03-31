@@ -29,7 +29,7 @@ class FedMAMLClient(BaseClient):
 
     def test(self):
         inner_opt = torch.optim.Adam(self.model.parameters(), lr=self.local_lr)
-        with higher.innerloop_ctx(self.model, inner_opt, self.device, copy_initial_weights=False) as (fmodel, diffopt):
+        with higher.innerloop_ctx(self.model, inner_opt, self.device, track_higher_grads=False) as (fmodel, diffopt):
             for _ in range(self.local_epochs):
                 for batch in self.test_support_loader:
                     support_loss, _ = self._training_step(batch, fmodel)
@@ -50,7 +50,7 @@ class FedMAMLClient(BaseClient):
         outer_opt = torch.optim.Adam(self.model.parameters(), lr=self.global_lr)
         inner_opt = torch.optim.Adam(self.model.parameters(), lr=self.local_lr)
 
-        with higher.innerloop_ctx(self.model, inner_opt, self.device, copy_initial_weights=False) as (fmodel, diffopt):
+        with higher.innerloop_ctx(self.model, inner_opt, self.device, track_higher_grads=True) as (fmodel, diffopt):
             num_batch = len(self.training_loader)
             for _ in range(self.local_epochs):
                 for idx, batch in enumerate(self.training_loader):

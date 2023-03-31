@@ -21,7 +21,7 @@ class FedAvgClient(BaseClient):
         self.testing_loader: DataLoader = testing_loader
 
     def train(self):
-        optimizer = torch.optim.SGD(self.model.parameters(), lr=self.local_lr)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.local_lr)
         num_sample = len(self.training_loader.dataset)
 
         for _ in range(self.local_epochs):
