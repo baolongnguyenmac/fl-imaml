@@ -1,0 +1,1 @@
+pandoc report.md -o report.pdf --number-sections -V colorlinks=true -V linkcolor=blue -V urlcolor=blue -V toccolor=gray --pdf-engine=xelatex

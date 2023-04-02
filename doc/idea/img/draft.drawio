@@ -1,0 +1,65 @@
+<mxfile host="app.diagrams.net" modified="2023-04-01T02:21:35.687Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36" version="21.1.2" etag="pBG0jJvcMfVhiVhojXfu" type="device">
+  <diagram id="8rakSG8i-2YuuxhY6oQB" name="Page-1">
+    <mxGraphModel dx="794" dy="434" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="1" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="4" style="edgeStyle=none;html=1;entryX=-0.029;entryY=0.45;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="3" target="6" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="310" y="190" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="5" value="adapt on support set" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="4" vertex="1" connectable="0">
+          <mxGeometry x="-0.0435" y="-1" relative="1" as="geometry">
+            <mxPoint y="-11" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="3" value="$$\omega$$" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+          <mxGeometry x="55" y="175" width="90" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="14" style="edgeStyle=orthogonalEdgeStyle;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="6" target="3" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="120" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="325" y="120" />
+              <mxPoint x="100" y="120" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="15" value="$$\frac{\partial \theta_i}{\partial \omega}$$" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="14" vertex="1" connectable="0">
+          <mxGeometry x="0.0609" y="-1" relative="1" as="geometry">
+            <mxPoint y="3" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="6" value="$$\theta_i$$" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+          <mxGeometry x="280" y="175" width="90" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="7" style="edgeStyle=none;html=1;" parent="1" source="6" target="9" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="512.97" y="189.5" as="targetPoint" />
+            <mxPoint x="360" y="190.31380007448" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="8" value="test on query&amp;nbsp;set" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="7" vertex="1" connectable="0">
+          <mxGeometry x="-0.0435" y="-1" relative="1" as="geometry">
+            <mxPoint y="-11" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="11" value="$$\frac{\partial loss(\theta_i)}{\partial \theta_i}$$" style="edgeStyle=orthogonalEdgeStyle;html=1;" parent="1" edge="1">
+          <mxGeometry y="-10" relative="1" as="geometry">
+            <mxPoint x="325" y="200" as="targetPoint" />
+            <mxPoint x="555" y="200" as="sourcePoint" />
+            <Array as="points">
+              <mxPoint x="555" y="260" />
+              <mxPoint x="325" y="260" />
+            </Array>
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="9" value="$$loss = L_{local}(\theta_i)$$" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+          <mxGeometry x="465" y="175" width="180" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

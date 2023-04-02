@@ -34,7 +34,7 @@
         - Tối ưu cấp cao trên tập $D_{query}$ để thu được tham số tối ưu toàn cục $\theta$.
 
 <p align="center">
-  <img width="700" height="300" src="./draft.svg">
+  <img width="700" height="300" src="./img/draft.svg">
 </p>
 
 ### 2.1. FL + `MAML`
