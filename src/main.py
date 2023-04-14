@@ -4,21 +4,24 @@ import torch
 
 from data.mnist_loader import get_loader as m_loader
 from data.cifar_loader import get_loader as c_loader
+from data.femnist_loader import get_loader as f_loader
 from server.fedavg_server import FedAvgServer
 from server.fedmaml_server import FedMAMLServer
 from server.fedimaml_server import FediMAMLServer
 from model.mnist_model import Mnist
 from model.cifar_model import Cifar
+from model.femnist_model import Femnist
 
 MNIST_DATA = MNIST_MODEL = 'mnist'
 CIFAR_DATA = CIFAR_MODEL = 'cifar'
+FEMNIST_DATA = FEMNIST_MODEL = 'femnist'
 
 FED_AVG = 'fed_avg'
 FED_MAML = 'fed_maml'
 FED_IMAML = 'fed_imaml'
 
 def config_dataset(dataset:str):
-    print('\nPreparing dataset ...')
+    print(f'\nPreparing {dataset} dataset ...')
     train_loaders = []
     test_support_loaders = []
     test_query_loaders = []
@@ -31,6 +34,10 @@ def config_dataset(dataset:str):
         train_dir = '../data/cifar/client_train'
         test_dir = '../data/cifar/client_test'
         loader = c_loader
+    elif dataset == FEMNIST_DATA:
+        train_dir = '../data/femnist/client_train'
+        test_dir = '../data/femnist/client_test'
+        loader = f_loader
 
     for train_file in os.listdir(train_dir):
         train_loaders.append(loader(os.path.join(train_dir, train_file)))
@@ -45,19 +52,21 @@ def config_dataset(dataset:str):
     return train_loaders, test_support_loaders, test_query_loaders
 
 def config_model(model:str):
-    print('\nPreparing model ...')
+    print(f'\nPreparing {model} model ...')
     if model == MNIST_MODEL:
         return Mnist()
     elif model == CIFAR_MODEL:
         return Cifar()
+    elif model == FEMNIST_MODEL:
+        return Femnist()
 
 def get_server(args: argparse.Namespace, command:dict):
-    print('\nPreparing server ...')
+    algo = args.algorithm
+    print(f'\nPreparing {algo} server ...')
     train_loaders, test_support_loaders, test_query_loaders = config_dataset(args.dataset)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f'\nUsing {device.type}')
 
-    algo = args.algorithm
     if algo == FED_AVG:
         return FedAvgServer(
             global_epochs=args.global_epochs,
@@ -99,7 +108,7 @@ def get_server(args: argparse.Namespace, command:dict):
             lambda_=args.lambda_,
             cg_step=args.cg_step)
     else:
-        print('meo')
+        raise NotImplementedError(f"{algo} hasn't been implemented yet.")
 
 
 def main():
@@ -109,8 +118,8 @@ def main():
     parser.add_argument("--global_lr", type=float, required=False, help="Global learning rate")
     parser.add_argument("--local_epochs", type=int, required=True, help="Local epochs")
     parser.add_argument("--local_lr", type=float, required=True, help="Local learning rate")
-    parser.add_argument("--dataset", type=str, required=True, help="Dataset", choices=[MNIST_DATA, CIFAR_DATA], default='mnist')
-    parser.add_argument("--model", type=str, required=True, help="Model", choices=[MNIST_MODEL, CIFAR_MODEL], default='mnist')
+    parser.add_argument("--dataset", type=str, required=True, help="Dataset", choices=[MNIST_DATA, CIFAR_DATA, FEMNIST_DATA], default='mnist')
+    parser.add_argument("--model", type=str, required=True, help="Model", choices=[MNIST_MODEL, CIFAR_MODEL, FEMNIST_MODEL], default='mnist')
     parser.add_argument("--algorithm", type=str, required=True, help="Algorithm", choices=[FED_AVG, FED_MAML, FED_IMAML], default='fed_avg')
     parser.add_argument("--clients_per_round", type=int, required=True, help="Number of client evolving in training each round", default=5)
     parser.add_argument("--lambda_", type=float, required=False, help="Regularization hyper-param")
