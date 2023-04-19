@@ -18,7 +18,7 @@ def track_gpu(sec:int):
             name = nvidia_smi.nvmlDeviceGetName(handle)
 
         percentage_used = used/total*100
-        print(f'3 {name}: Using {percentage_used:.3f}% ({used/(2**30):.3f} GB)')
+        print(f'{deviceCount} GPU(s): Using {percentage_used:.3f}% ({used/(2**30):.3f} GB)')
 
         sleep(sec)
 
