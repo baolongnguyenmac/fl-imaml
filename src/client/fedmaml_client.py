@@ -48,6 +48,7 @@ class FedMAMLClient(BaseClient):
                     correct += query_correct
                     outer_loss += query_loss.item()
 
+        tqdm.write(f'MAML client {self.id}: Support = {len(self.test_support_loader)} batch(es), Query = {len(self.test_query_loader)} batch(es), Testing loss = {outer_loss:.7f}, Testing acc = {correct/num_sample*100:.2f}%')
         return outer_loss, correct/len(self.test_query_loader.dataset)
 
     def _outer_loop(self):
