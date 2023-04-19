@@ -17,7 +17,7 @@ def gen_cifar(
     ):
     """generate data for non-iid scenario (no local client for testing)
     """
-    print('\n=========== Generating data ===========')
+    print('\n=========== Generate data ===========')
 
     training_intervals = int(num_training_clients/num_labels*num_labels_per_client)
     testing_intervals = int(num_testing_clients/num_labels*num_labels_per_client)

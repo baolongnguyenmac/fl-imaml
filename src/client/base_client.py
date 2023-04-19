@@ -1,6 +1,6 @@
 import torch
 from copy import deepcopy
-import torch.nn.functional as F
+import torch.nn as nn
 
 class BaseClient:
     def __init__(
@@ -27,11 +27,12 @@ class BaseClient:
     def test(self):
         raise NotImplementedError('override test method in subclass')
 
-    def _training_step(self, batch:list, model:torch.nn.Module):
+    def _training_step(self, batch:list, model:nn.Module):
+        loss_fn = nn.NLLLoss()
         X, y = batch[0].to(self.device), batch[1].to(self.device)
         pred = model(X)
-        loss = F.cross_entropy(pred, y)
-        correct = (pred.argmax(1) == y).type(torch.float).sum().item()
+        loss = loss_fn(pred, y)
+        correct = (torch.max(pred, 1)[1] == y).sum().item()
         return loss, correct
 
     def train(self):

@@ -5,7 +5,6 @@ import torch
 from torch.utils.data import DataLoader
 from torch.nn.utils import parameters_to_vector
 import higher
-import torch.nn.functional as F
 
 from .base_client import BaseClient
 
@@ -32,7 +31,9 @@ class FediMAMLClient(BaseClient):
             model: torch.nn.Module,
             device: torch.device,
             id: int,
-            training_loader: DataLoader = None,
+            # training_loader: DataLoader = None,
+            train_support_loader: DataLoader = None,
+            train_query_loader: DataLoader = None,
             test_support_loader: DataLoader = None,
             test_query_loader: DataLoader = None,
             lambda_: float = 100.,
@@ -40,7 +41,9 @@ class FediMAMLClient(BaseClient):
         ) -> None:
         super().__init__(local_epochs, local_lr, model, device, id)
         self.global_lr = global_lr
-        self.training_loader: DataLoader = training_loader
+        # self.training_loader: DataLoader = training_loader
+        self.train_support_loader: DataLoader = train_support_loader
+        self.train_query_loader: DataLoader = train_query_loader
         self.test_support_loader: DataLoader = test_support_loader
         self.test_query_loader: DataLoader = test_query_loader
 
@@ -48,7 +51,7 @@ class FediMAMLClient(BaseClient):
         self.cg_step:int = cg_step
 
     def test(self):
-        inner_opt = torch.optim.Adam(self.model.parameters(), lr=self.local_lr)
+        inner_opt = torch.optim.SGD(self.model.parameters(), lr=self.local_lr)
         with higher.innerloop_ctx(self.model, inner_opt, self.device, track_higher_grads=False) as (fmodel, diffopt):
             for _ in range(self.local_epochs):
                 for batch in self.test_support_loader:
@@ -57,14 +60,13 @@ class FediMAMLClient(BaseClient):
 
             outer_loss = 0.
             correct = 0.
-            num_sample = len(self.test_query_loader.dataset)
             for batch in self.test_query_loader:
                 query_loss, query_correct = self._training_step(batch, fmodel)
 
                 correct += query_correct
                 outer_loss += query_loss.item()
 
-        return outer_loss, correct/num_sample
+        return outer_loss, correct/len(self.test_query_loader.dataset)
 
     @torch.no_grad()
     def conjugate_grad(self, inner_grad:torch.Tensor, outer_grad:torch.Tensor, params:list[torch.Tensor]):
@@ -98,58 +100,50 @@ class FediMAMLClient(BaseClient):
         return hv/self.lambda_ + x
 
     def loss_fn(self, pred:list[torch.Tensor], y:list[torch.Tensor], local_params:list[torch.Tensor], global_params:list[torch.Tensor]):
-        return F.cross_entropy(pred, y) + self.lambda_/2 * sum([((lp - gp) ** 2).sum() for gp, lp in zip(global_params, local_params)])
+        return torch.nn.NLLLoss(pred, y) + self.lambda_/2 * sum([((lp - gp) ** 2).sum() for gp, lp in zip(global_params, local_params)])
 
     def _training_step(self, batch:list, model:torch.nn.Module):
         X, y = batch[0].to(self.device), batch[1].to(self.device)
         pred = model(X)
         loss = self.loss_fn(pred, y, list(model.parameters()), list(self.model.parameters()))
-        correct = (pred.argmax(1) == y).type(torch.float).sum().item()
+        correct = (torch.max(pred, 1)[1] == y).sum().item()
         return loss, correct
 
     def _outer_loop(self):
         outer_opt = torch.optim.Adam(self.model.parameters(), lr=self.global_lr)
-        inner_opt = torch.optim.Adam(self.model.parameters(), lr=self.local_lr)
+        inner_opt = torch.optim.SGD(self.model.parameters(), lr=self.local_lr)
 
-        with higher.innerloop_ctx(self.model, inner_opt, self.device, track_higher_grads=False) as (fmodel, diffopt):
-            num_batch = len(self.training_loader)
+        with higher.innerloop_ctx(self.model, inner_opt, self.device, copy_initial_weights=False, track_higher_grads=False) as (fmodel, diffopt):
+            outer_opt.zero_grad()
             for _ in range(self.local_epochs):
-                for idx, batch in enumerate(self.training_loader):
-                    if idx <= 0.2*num_batch:
-                        support_loss, _ = self._training_step(batch, fmodel)
-                        diffopt.step(support_loss)
+                for batch in self.train_support_loader:
+                    support_loss, _ = self._training_step(batch, fmodel)
+                    diffopt.step(support_loss)
 
             inner_loss = 0.
-            for idx, batch in enumerate(self.training_loader):
-                if idx <= 0.2*num_batch:
-                    support_loss, _ = self._training_step(batch, fmodel)
-                    inner_loss += support_loss
+            for batch in self.train_query_loader:
+                support_loss, _ = self._training_step(batch, fmodel)
+                inner_loss += support_loss
 
             outer_loss = 0.
             correct = 0.
-            num_sample = 0
-            for idx, batch in enumerate(self.training_loader):
-                if idx > 0.2*num_batch or num_batch == 1:
-                    query_loss, query_correct = self._training_step(batch, fmodel)
+            for batch in self.train_query_loader:
+                query_loss, query_correct = self._training_step(batch, fmodel)
 
-                    outer_loss += query_loss
-                    correct += query_correct
-                    num_sample += len(batch[0])
+                outer_loss += query_loss
+                correct += query_correct
 
             params = list(fmodel.parameters())
             inner_grad = parameters_to_vector(torch.autograd.grad(inner_loss, params, create_graph=True))
-            outer_grad = parameters_to_vector(torch.autograd.grad(outer_loss, params))
+            outer_grad = parameters_to_vector(torch.autograd.grad(query_loss, params))
             implicit_grad = self.conjugate_grad(inner_grad, outer_grad, params)
+            apply_grad(self.model, implicit_grad)
 
-        outer_opt.zero_grad()
-        apply_grad(self.model, implicit_grad)
         outer_opt.step()
 
-        self.num_training_sample = num_sample
-
-        tqdm.write(f'iMAML client {self.id}: Training loss = {outer_loss.item():.7f}, Training acc = {correct/num_sample*100:.2f}%')
-
-        return outer_loss.item(), correct/num_sample
+        self.num_training_sample = len(self.train_query_loader.dataset)
+        tqdm.write(f'iMAML client {self.id}: Training loss = {outer_loss.item():.7f}, Training acc = {correct/self.num_training_sample*100:.2f}%')
+        return outer_loss.item(), correct/self.num_training_sample
 
     def train(self):
         return self._outer_loop()

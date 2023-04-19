@@ -14,7 +14,9 @@ class FedMAMLServer(BaseServer):
             local_lr: float,
             model: torch.nn.Module,
             num_activated_clients: int,
-            training_loaders:list[DataLoader],
+            # training_loaders:list[DataLoader],
+            train_support_loaders: list[DataLoader],
+            train_query_loaders: list[DataLoader],
             test_support_loaders: list[DataLoader],
             test_query_loaders: list[DataLoader],
             command: dict
@@ -22,10 +24,10 @@ class FedMAMLServer(BaseServer):
         super().__init__(global_epochs, device, global_lr, model, num_activated_clients, command)
 
         # init data for client
-        for idx, loader in enumerate(training_loaders):
-            tmp_client = FedMAMLClient(local_epochs, local_lr, global_lr, self.model, device, idx, loader, None, None)
+        for idx, (support_loader, query_loader) in enumerate(zip(train_support_loaders, train_query_loaders)):
+            tmp_client = FedMAMLClient(local_epochs, local_lr, global_lr, self.model, device, idx, support_loader, query_loader, None, None)
             self.training_clients.append(tmp_client)
 
         for idx, (support_loader, query_loader) in enumerate(zip(test_support_loaders, test_query_loaders)):
-            tmp_client = FedMAMLClient(local_epochs, local_lr, global_lr, self.model, device, idx, None, support_loader, query_loader)
+            tmp_client = FedMAMLClient(local_epochs, local_lr, global_lr, self.model, device, idx, None, None, support_loader, query_loader)
             self.testing_clients.append(tmp_client)
