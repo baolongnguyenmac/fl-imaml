@@ -3,15 +3,23 @@ from time import sleep
 
 def track_gpu(sec:int):
     nvidia_smi.nvmlInit()
+    deviceCount = nvidia_smi.nvmlDeviceGetCount()
 
     while True:
-        handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
-        info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
-        name = nvidia_smi.nvmlDeviceGetName(handle)
-        percentage_used = info.used/info.total*100
-        print(f'{name}: Using {percentage_used:.3f}% ({info.used/(2**30):.3f} GB)')
-        # s = f"Device 0: {nvidia_smi.nvmlDeviceGetName(handle)}, Memory : ({100*info.free/info.total:.2f}% free): {info.total}(total), {info.free} (free), {info.used} (used)"
-        # print("Device {}: {}, Memory : ({:.2f}% free): {}(total), {} (free), {} (used)".format(0, nvidia_smi.nvmlDeviceGetName(handle), 100*info.free/info.total, info.total, info.free, info.used))
+
+        used = 0
+        total = 0
+
+        for i in range(deviceCount):
+            handle = nvidia_smi.nvmlDeviceGetHandleByIndex(i)
+            info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
+            total += info.total
+            used += info.used
+            name = nvidia_smi.nvmlDeviceGetName(handle)
+
+        percentage_used = used/total*100
+        print(f'3 {name}: Using {percentage_used:.3f}% ({used/(2**30):.3f} GB)')
+
         sleep(sec)
 
-track_gpu(2)
+track_gpu(1.5)
