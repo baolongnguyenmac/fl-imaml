@@ -48,7 +48,7 @@ class FedMAMLClient(BaseClient):
                     correct += query_correct
                     outer_loss += query_loss.item()
 
-        tqdm.write(f'MAML client {self.id}: Support = {len(self.test_support_loader)} batch(es), Query = {len(self.test_query_loader)} batch(es), Testing loss = {outer_loss:.7f}, Testing acc = {correct/num_sample*100:.2f}%')
+        tqdm.write(f'MAML client {self.id}: Support = {len(self.test_support_loader)} batch(es), Query = {len(self.test_query_loader)} batch(es), Testing loss = {outer_loss:.7f}, Testing acc = {correct/len(self.test_query_loader.dataset)*100:.2f}%')
         return outer_loss, correct/len(self.test_query_loader.dataset)
 
     def _outer_loop(self):
@@ -79,7 +79,7 @@ class FedMAMLClient(BaseClient):
         outer_opt.step()
 
         self.num_training_sample = len(self.train_query_loader.dataset)
-        tqdm.write(f'MAML client {self.id}: Support = {len(self.train_support_loader)} batch(es), Query = {len(self.train_query_loader)} batch(es), Training loss = {outer_loss.item():.7f}, Training acc = {correct/num_sample*100:.2f}%')
+        tqdm.write(f'MAML client {self.id}: Support = {len(self.train_support_loader)} batch(es), Query = {len(self.train_query_loader)} batch(es), Training loss = {outer_loss.item():.7f}, Training acc = {correct/self.num_training_sample*100:.2f}%')
         return outer_loss.item(), correct/self.num_training_sample
 
     def train(self):

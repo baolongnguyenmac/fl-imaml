@@ -21,8 +21,9 @@ main-blx.bib
 
 # dataset
 data/mnist
-data/cifar
-data/femnist
+data/cifar10
+data/cifar100
+data/emnist
 
 # run_split script
 data_gen.sh

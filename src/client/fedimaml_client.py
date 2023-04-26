@@ -100,7 +100,7 @@ class FediMAMLClient(BaseClient):
         return hv/self.lambda_ + x
 
     def loss_fn(self, pred:list[torch.Tensor], y:list[torch.Tensor], local_params:list[torch.Tensor], global_params:list[torch.Tensor]):
-        return torch.nn.NLLLoss(pred, y) + self.lambda_/2 * sum([((lp - gp) ** 2).sum() for gp, lp in zip(global_params, local_params)])
+        return torch.nn.NLLLoss()(pred, y) + self.lambda_/2 * sum([((lp - gp) ** 2).sum() for gp, lp in zip(global_params, local_params)])
 
     def _training_step(self, batch:list, model:torch.nn.Module):
         X, y = batch[0].to(self.device), batch[1].to(self.device)
